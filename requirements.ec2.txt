@@ -1,0 +1,39 @@
+# EC2 GPU Instance Requirements
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# AWS services
+boto3==1.34.0
+botocore==1.34.0
+
+# Environment and configuration
+python-dotenv==1.0.1
+
+# Data processing
+numpy>=1.24.3,<2.0
+pillow==10.0.1
+opencv-python==4.8.1.78
+
+# Machine Learning - GPU optimized
+--find-links https://download.pytorch.org/whl/torch_stable.html
+torch==2.1.0+cu118
+torchvision==0.16.0+cu118
+torchaudio==2.1.0+cu118
+
+# Face recognition with GPU support
+insightface==0.7.3
+onnxruntime-gpu==1.16.3
+onnx==1.15.0
+
+# Database and search
+elasticsearch==8.10.0
+
+# Utilities
+tqdm==4.66.1
+requests==2.31.0
+
+# Optional: Additional GPU utilities
+# nvidia-ml-py3==7.352.0  # For GPU monitoring
+# transformers==4.36.0     # If you need transformer models 

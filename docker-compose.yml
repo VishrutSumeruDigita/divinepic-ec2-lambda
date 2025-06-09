@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  divinepic-fastapi:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: divinepic-container
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - /tmp:/tmp
+      - ./logs:/app/logs
+    environment:
+      - AWS_REGION=ap-south-1
+      - S3_BUCKET_NAME=divinepic-test
+      - S3_UPLOAD_PATH=upload_with_embed
+      - ES_HOSTS1=http://3.6.116.114:9200
+      - INDEX_NAME=face_embeddings
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+
+  # Optional: Add a monitoring service
+  gpu-monitor:
+    image: nvidia/cuda:11.8-base-ubuntu20.04
+    container_name: gpu-monitor
+    restart: unless-stopped
+    command: |
+      sh -c "
+        apt-get update && apt-get install -y curl &&
+        while true; do
+          echo '$(date): GPU Status:' &&
+          nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total --format=csv &&
+          echo '$(date): Container Status:' &&
+          curl -s http://divinepic-fastapi:8000/health || echo 'FastAPI not ready' &&
+          sleep 60
+        done
+      "
+    depends_on:
+      - divinepic-fastapi
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - ./logs:/logs
+
+networks:
+  default:
+    name: divinepic-network
