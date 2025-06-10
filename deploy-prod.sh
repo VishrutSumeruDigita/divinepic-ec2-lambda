@@ -146,7 +146,7 @@ EOF
         # Update environment variables
         aws lambda update-function-configuration \
             --function-name "$LAMBDA_FUNCTION_NAME" \
-            --environment Variables="{PROD_INSTANCE_ID=$PROD_INSTANCE_ID,AWS_REGION=$AWS_REGION,ENVIRONMENT=production}" \
+            --environment Variables="{PROD_INSTANCE_ID=$PROD_INSTANCE_ID,ENVIRONMENT=production}" \
             --region "$AWS_REGION"
     else
         echo -e "${YELLOW}Creating new PRODUCTION Lambda function${NC}"
@@ -162,7 +162,7 @@ EOF
             --zip-file fileb://lambda-prod-deployment.zip \
             --timeout 900 \
             --memory-size 256 \
-            --environment Variables="{PROD_INSTANCE_ID=$PROD_INSTANCE_ID,AWS_REGION=$AWS_REGION,ENVIRONMENT=production}" \
+            --environment Variables="{PROD_INSTANCE_ID=$PROD_INSTANCE_ID,ENVIRONMENT=production}" \
             --region "$AWS_REGION"
             
         # Add dead letter queue for production

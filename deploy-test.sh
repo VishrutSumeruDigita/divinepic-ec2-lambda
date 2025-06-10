@@ -135,7 +135,7 @@ EOF
         # Update environment variables
         aws lambda update-function-configuration \
             --function-name "$LAMBDA_FUNCTION_NAME" \
-            --environment Variables="{TEST_INSTANCE_ID=$TEST_INSTANCE_ID,AWS_REGION=$AWS_REGION,ENVIRONMENT=test}" \
+            --environment Variables="{TEST_INSTANCE_ID=$TEST_INSTANCE_ID,ENVIRONMENT=test}" \
             --region "$AWS_REGION"
     else
         echo -e "${YELLOW}Creating new TEST Lambda function${NC}"
@@ -151,7 +151,7 @@ EOF
             --zip-file fileb://lambda-test-deployment.zip \
             --timeout 900 \
             --memory-size 128 \
-            --environment Variables="{TEST_INSTANCE_ID=$TEST_INSTANCE_ID,AWS_REGION=$AWS_REGION,ENVIRONMENT=test}" \
+            --environment Variables="{TEST_INSTANCE_ID=$TEST_INSTANCE_ID,ENVIRONMENT=test}" \
             --region "$AWS_REGION"
     fi
     
