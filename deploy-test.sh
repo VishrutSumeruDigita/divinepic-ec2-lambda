@@ -194,6 +194,14 @@ EOF
         --role-name divinepic-test-lambda-role \
         --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess
     
+    aws iam attach-role-policy \
+        --role-name divinepic-test-lambda-role \
+        --policy-arn arn:aws:iam::aws:policy/AmazonSSMFullAccess
+    
+    aws iam attach-role-policy \
+        --role-name divinepic-test-lambda-role \
+        --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+    
     rm trust-policy-test.json
     
     # Wait for role to be available
@@ -208,24 +216,88 @@ setup_test_ec2_instance() {
     # Upload startup script to S3
     aws s3 cp ec2-startup-test.sh s3://$S3_BUCKET/scripts/startup-script-test.sh
     
+    # Create IAM role for EC2 instance (for SSM access)
+    create_ec2_iam_role_for_test
+    
     # Create user data script for TEST environment
     cat > user-data-test.sh << EOF
 #!/bin/bash
-yum update -y
-yum install -y awscli
-aws s3 cp s3://$S3_BUCKET/scripts/startup-script-test.sh /home/ec2-user/startup-script-test.sh --region $AWS_REGION
-chmod +x /home/ec2-user/startup-script-test.sh
+apt update -y
+apt install -y awscli
+
+# Install and start SSM agent
+snap install amazon-ssm-agent --classic
+systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service
+systemctl enable snap.amazon-ssm-agent.amazon-ssm-agent.service
+
+# Download and run startup script
+aws s3 cp s3://$S3_BUCKET/scripts/startup-script-test.sh /home/ubuntu/startup-script-test.sh --region $AWS_REGION
+chmod +x /home/ubuntu/startup-script-test.sh
+chown ubuntu:ubuntu /home/ubuntu/startup-script-test.sh
+
 # Update the instance ID in the script
-sed -i 's/i-test-cpu-instance/$TEST_INSTANCE_ID/g' /home/ec2-user/startup-script-test.sh
-/home/ec2-user/startup-script-test.sh >> /var/log/startup-test.log 2>&1
+sed -i 's/i-test-cpu-instance/$TEST_INSTANCE_ID/g' /home/ubuntu/startup-script-test.sh
+
+# Log startup process
+echo "TEST Instance setup completed at \$(date)" >> /var/log/startup-test.log
 EOF
     
     echo -e "${GREEN}✅ TEST EC2 setup files uploaded${NC}"
-    echo -e "${YELLOW}⚠️  Remember to:${NC}"
+    echo -e "${YELLOW}⚠️  Important Setup Instructions:${NC}"
     echo "1. Update your TEST EC2 instance user data with the contents of user-data-test.sh"
-    echo "2. Ensure your TEST instance has an IAM role with S3 and EC2 permissions"
-    echo "3. Use a CPU instance type (t3.large, m5.large, etc.)"
-    echo "4. Update TEST_INSTANCE_ID variable in this script with your actual instance ID"
+    echo "2. Attach the IAM role 'DivinePic-TEST-EC2-Role' to your instance"
+    echo "3. Ensure Security Group allows inbound port 8000 (0.0.0.0/0)"
+    echo "4. Reboot the instance to apply user data changes"
+    echo "5. Then run: aws lambda invoke --function-name $LAMBDA_FUNCTION_NAME --payload file://test-payload.json response.json"
+}
+
+# Function to create IAM role for EC2 instance
+create_ec2_iam_role_for_test() {
+    echo -e "${YELLOW}🔐 Creating IAM role for TEST EC2 instance${NC}"
+    
+    # Trust policy for EC2
+    cat > ec2-trust-policy.json << EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+    
+    # Create EC2 role
+    aws iam create-role \
+        --role-name DivinePic-TEST-EC2-Role \
+        --assume-role-policy-document file://ec2-trust-policy.json || true
+    
+    # Attach policies for EC2
+    aws iam attach-role-policy \
+        --role-name DivinePic-TEST-EC2-Role \
+        --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+    
+    aws iam attach-role-policy \
+        --role-name DivinePic-TEST-EC2-Role \
+        --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+    
+    # Create instance profile
+    aws iam create-instance-profile \
+        --instance-profile-name DivinePic-TEST-EC2-Profile || true
+    
+    # Add role to instance profile
+    aws iam add-role-to-instance-profile \
+        --instance-profile-name DivinePic-TEST-EC2-Profile \
+        --role-name DivinePic-TEST-EC2-Role || true
+    
+    rm ec2-trust-policy.json
+    
+    echo -e "${GREEN}✅ TEST EC2 IAM role created${NC}"
+    echo -e "${YELLOW}⚠️  Remember to attach 'DivinePic-TEST-EC2-Profile' to your EC2 instance${NC}"
 }
 
 # Function to test the TEST deployment
